@@ -1,0 +1,52 @@
+import streamlit as st
+import pandas as pd
+import serial
+import time
+
+st.set_page_config(layout="wide")
+st.title("🌱 Sensor Dashboard: Ultrasonic + DHT11")
+
+# 🔹 Update your COM port
+ser = serial.Serial('COM5', 115200, timeout=1)
+
+ultra_data = []
+dht_data = []
+
+placeholder_ultra = st.empty()
+placeholder_dht = st.empty()
+
+while True:
+    if ser.in_waiting > 0:
+        line = ser.readline().decode('utf-8').strip()
+        try:
+            distance, temp, hum = map(float, line.split(","))
+            ultra_data.append(distance)
+            dht_data.append((temp, hum))
+
+            if len(ultra_data) > 50:
+                ultra_data.pop(0)
+                dht_data.pop(0)
+        except:
+            continue
+
+    # Ultrasonic Box
+    with placeholder_ultra.container():
+        st.subheader("📏 Ultrasonic Sensor (Distance)")
+        df_ultra = pd.DataFrame(ultra_data, columns=["Distance (cm)"])
+        st.dataframe(df_ultra.tail(5))
+        if df_ultra.shape[0] > 0:
+            st.metric("Latest Distance", f"{df_ultra['Distance (cm)'].iloc[-1]:.2f} cm")
+            st.line_chart(df_ultra)
+
+    # DHT11 Box
+    with placeholder_dht.container():
+        st.subheader("🌡 DHT11 Sensor")
+        df_dht = pd.DataFrame(dht_data, columns=["Temperature (°C)", "Humidity (%)"])
+        st.dataframe(df_dht.tail(5))
+        if df_dht.shape[0] > 0:
+            latest = df_dht.iloc[-1]
+            st.metric("Temperature", f"{latest['Temperature (°C)']:.2f} °C")
+            st.metric("Humidity", f"{latest['Humidity (%)']:.2f} %")
+            st.line_chart(df_dht)
+            
+    time.sleep(2)
